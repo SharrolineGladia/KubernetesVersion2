@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notification-service-monitor
+  namespace: monitoring
+  labels:
+    release: monitoring        # 🔴 THIS IS REQUIRED
+spec:
+  selector:
+    matchLabels:
+      app: notification-service
+  namespaceSelector:
+    matchNames:
+      - journal-implementation
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s
