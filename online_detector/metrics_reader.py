@@ -1,7 +1,7 @@
 # metrics_reader.py
 
 import requests
-from config import PROMETHEUS_URL, SERVICE_NAME, NAMESPACE
+from .config import PROMETHEUS_URL, SERVICE_NAME, NAMESPACE
 
 class PrometheusClient:
     def __init__(self, base_url=PROMETHEUS_URL):
@@ -39,3 +39,16 @@ class PrometheusClient:
         return self.query(
             f'notification_service_thread_count{{namespace="{NAMESPACE}",service="{SERVICE_NAME}"}}'
         )
+
+    def get_p95_response_time(self) -> float:
+        """Get p95 response time in milliseconds."""
+        return self.query(
+            f'notification_service_response_time_p95_ms{{namespace="{NAMESPACE}",service="{SERVICE_NAME}"}}'
+        )
+
+    def get_queue_depth(self) -> float:
+        """Get current queue depth."""
+        return self.query(
+            f'notification_service_internal_queue_depth{{namespace="{NAMESPACE}",service="{SERVICE_NAME}"}}'
+        )
+
