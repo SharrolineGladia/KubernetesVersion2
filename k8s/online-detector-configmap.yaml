@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: online-detector-config
+  namespace: journal-implementation
+data:
+  # Prometheus Configuration
+  PROMETHEUS_URL: "http://prometheus-service:9090"
+
+  # Target Service
+  SERVICE_NAME: "notification-service"
+  NAMESPACE: "journal-implementation"
+
+  # Sampling Configuration
+  SCRAPE_INTERVAL_SECONDS: "5"
+
+  # EWMA Parameters
+  EWMA_ALPHA: "0.05"
+  Z_MAX: "6.0"
+
+  # Channel Weights
+  CPU_WEIGHT: "0.5"
+  MEMORY_WEIGHT: "0.3"
+  THREAD_WEIGHT: "0.2"
+
+  # FSM Thresholds
+  NORMAL_THRESHOLD: "0.35"
+  ANOMALY_THRESHOLD: "0.60"
+
+  # FSM Windows
+  NORMAL_TO_STRESSED_WINDOWS: "3"
+  STRESSED_TO_CRITICAL_WINDOWS: "3"
+  STRESSED_TO_NORMAL_WINDOWS: "5"
+  CRITICAL_TO_STRESSED_WINDOWS: "3"
+
+  # Resource Saturation Soft Limits
+  CPU_SOFT_LIMIT: "100.0"
+  MEMORY_SOFT_LIMIT_MB: "250.0"
+  THREAD_SOFT_LIMIT: "60.0"
+
+  # Performance Degradation Thresholds (in milliseconds)
+  # ADJUST THESE BASED ON YOUR SERVICE'S ACTUAL BASELINE!
+  P95_RESPONSE_TIME_BASELINE: "150.0"
+  P95_RESPONSE_TIME_STRESSED: "300.0"
+  P95_RESPONSE_TIME_CRITICAL: "500.0"
+
+  # Backpressure Overload Thresholds (queue depth)
+  # ADJUST THESE BASED ON YOUR SERVICE'S ACTUAL QUEUE BEHAVIOR!
+  QUEUE_DEPTH_BASELINE: "10.0"
+  QUEUE_DEPTH_STRESSED: "50.0"
+  QUEUE_DEPTH_CRITICAL: "100.0"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: online-detector-config-high-throughput
+  namespace: journal-implementation
+  labels:
+    service-type: high-throughput
+data:
+  # Example: Configuration for a high-throughput service
+  # These services typically have higher baseline latency
+
+  PROMETHEUS_URL: "http://prometheus-service:9090"
+  SERVICE_NAME: "payment-processor"
+  NAMESPACE: "journal-implementation"
+
+  # More lenient thresholds for high-throughput services
+  P95_RESPONSE_TIME_BASELINE: "300.0" # Higher baseline
+  P95_RESPONSE_TIME_STRESSED: "600.0"
+  P95_RESPONSE_TIME_CRITICAL: "1000.0"
+
+  # Higher queue tolerance
+  QUEUE_DEPTH_BASELINE: "50.0"
+  QUEUE_DEPTH_STRESSED: "200.0"
+  QUEUE_DEPTH_CRITICAL: "500.0"
+
+  # Higher resource limits
+  CPU_SOFT_LIMIT: "200.0"
+  MEMORY_SOFT_LIMIT_MB: "1024.0"
+  THREAD_SOFT_LIMIT: "200.0"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: online-detector-config-latency-sensitive
+  namespace: journal-implementation
+  labels:
+    service-type: latency-sensitive
+data:
+  # Example: Configuration for a latency-sensitive service (e.g., real-time API)
+  # These services require strict latency guarantees
+
+  PROMETHEUS_URL: "http://prometheus-service:9090"
+  SERVICE_NAME: "realtime-api"
+  NAMESPACE: "journal-implementation"
+
+  # Stricter thresholds for latency-sensitive services
+  P95_RESPONSE_TIME_BASELINE: "50.0" # Very low baseline
+  P95_RESPONSE_TIME_STRESSED: "100.0"
+  P95_RESPONSE_TIME_CRITICAL: "200.0"
+
+  # Lower queue tolerance
+  QUEUE_DEPTH_BASELINE: "5.0"
+  QUEUE_DEPTH_STRESSED: "20.0"
+  QUEUE_DEPTH_CRITICAL: "50.0"
+
+  # More aggressive anomaly detection
+  EWMA_ALPHA: "0.03" # Slower adaptation
+  NORMAL_THRESHOLD: "0.30"
+  ANOMALY_THRESHOLD: "0.50"
