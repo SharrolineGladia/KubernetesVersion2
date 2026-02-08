@@ -8,9 +8,10 @@ PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
 SCRAPE_INTERVAL_SECONDS = int(os.getenv("SCRAPE_INTERVAL_SECONDS", "5"))
 
 # EWMA parameters
-# Lower alpha = slower adaptation, better anomaly detection (0.05-0.1 for production)
-# Set to 0.05 to prevent stress from becoming "new normal" within minutes
-EWMA_ALPHA = float(os.getenv("EWMA_ALPHA", "0.05"))
+# Lower alpha = slower adaptation, better anomaly detection (0.01-0.05 for production)
+# Set to 0.01 to prevent anomalies from becoming "new normal" too quickly
+# At alpha=0.01, it takes ~100 samples (~8 minutes) for baseline to shift significantly
+EWMA_ALPHA = float(os.getenv("EWMA_ALPHA", "0.01"))
 EPSILON = 1e-6
 
 # Z-score normalization
@@ -43,11 +44,11 @@ NAMESPACE = os.getenv("NAMESPACE", "journal-implementation")
 # Soft limits for static "pressure" scoring (0..1). Tune these per environment.
 # CPU is expressed as percent (psutil style; can exceed 100 on multi-core).
 # Set these ABOVE baseline to give headroom:
-# - Baseline memory ~140MB, set limit at 250MB (gives pressure ~0.56 at baseline)
-# - Baseline threads ~10, set limit at 60
+# - Observed baseline: CPU ~5%, Memory ~320MB, Threads ~75
+# - Set limits with 50-100% headroom for anomaly detection
 CPU_SOFT_LIMIT = float(os.getenv("CPU_SOFT_LIMIT", "100.0"))
-MEMORY_SOFT_LIMIT_MB = float(os.getenv("MEMORY_SOFT_LIMIT_MB", "250.0"))
-THREAD_SOFT_LIMIT = float(os.getenv("THREAD_SOFT_LIMIT", "60.0"))
+MEMORY_SOFT_LIMIT_MB = float(os.getenv("MEMORY_SOFT_LIMIT_MB", "450.0"))  # 320MB baseline + 40% headroom
+THREAD_SOFT_LIMIT = float(os.getenv("THREAD_SOFT_LIMIT", "120.0"))  # 75 baseline + 60% headroom
 
 # ============================================================================
 # ABSOLUTE THRESHOLDS FOR PERFORMANCE & BACKPRESSURE CHANNELS
