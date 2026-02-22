@@ -19,6 +19,9 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8003
+          env:
+            - name: JAEGER_ENDPOINT
+              value: "http://jaeger.default.svc.cluster.local:14268/api/traces"
           resources:
             requests:
               cpu: "100m"

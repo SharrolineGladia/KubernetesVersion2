@@ -16,7 +16,15 @@ from starlette.responses import Response
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import distributed tracing
-from tracing_utils import DistributedTracer, SpanContext, get_current_span
+from tracing_utils import DistributedTracer, SpanContext, get_current_span, set_jaeger_exporter
+
+# Try to import Jaeger exporter (optional)
+try:
+    from jaeger_exporter import JaegerExporter
+    JAEGER_ENABLED = True
+except ImportError:
+    JAEGER_ENABLED = False
+    print("Note: Jaeger exporter not available. Install 'requests' package to enable.")
 
 # Simple logging function
 def log_message(level, message, **kwargs):
@@ -28,8 +36,17 @@ def log_message(level, message, **kwargs):
         'level': level,
         'message': message,
         'pid': os.getpid(),
-        **kwargs
     }
+    
+    # Add trace context if available
+    current_span = get_current_span()
+    if current_span:
+        log_data['trace_id'] = current_span.trace_id
+        log_data['span_id'] = current_span.span_id
+    
+    # Add additional context
+    log_data.update(kwargs)
+    
     print(json.dumps(log_data))
 
 # Prometheus metrics
@@ -786,6 +803,21 @@ def main():
     print("   Health: http://localhost:8003/health") 
     print("   Metrics: http://localhost:8003/metrics")
     print("   Press Ctrl+C to stop")
+    
+    # Initialize Jaeger exporter if available
+    if JAEGER_ENABLED:
+        jaeger_endpoint = os.getenv('JAEGER_ENDPOINT', 'http://localhost:14268/api/traces')
+        try:
+            exporter = JaegerExporter(jaeger_endpoint)
+            set_jaeger_exporter(exporter)
+            print(f"   Jaeger Tracing: ENABLED ({jaeger_endpoint})")
+            log_message('INFO', 'Jaeger tracing enabled', endpoint=jaeger_endpoint)
+        except Exception as e:
+            print(f"   Jaeger Tracing: FAILED ({e})")
+            log_message('WARNING', 'Failed to initialize Jaeger', error=str(e))
+    else:
+        print("   Jaeger Tracing: DISABLED (install 'requests' package to enable)")
+        log_message('INFO', 'Jaeger tracing disabled')
 
     # psutil CPU sampling warm-up so the first reading isn't misleading.
     try:

@@ -1,0 +1,88 @@
+---
+# Jaeger All-in-One deployment for development/demo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: default
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.51
+        env:
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        ports:
+        - containerPort: 5775
+          protocol: UDP
+          name: zipkin-compact
+        - containerPort: 6831
+          protocol: UDP
+          name: jaeger-compact
+        - containerPort: 6832
+          protocol: UDP
+          name: jaeger-binary
+        - containerPort: 5778
+          protocol: TCP
+          name: configs
+        - containerPort: 16686
+          protocol: TCP
+          name: ui
+        - containerPort: 14268
+          protocol: TCP
+          name: collector
+        - containerPort: 14250
+          protocol: TCP
+          name: grpc
+        - containerPort: 9411
+          protocol: TCP
+          name: zipkin
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: default
+  labels:
+    app: jaeger
+spec:
+  type: NodePort
+  ports:
+  - port: 16686
+    targetPort: 16686
+    nodePort: 30686
+    name: ui
+  - port: 14268
+    targetPort: 14268
+    nodePort: 30268
+    name: collector
+  - port: 6831
+    protocol: UDP
+    targetPort: 6831
+    name: jaeger-compact
+  - port: 5775
+    protocol: UDP
+    targetPort: 5775
+    name: zipkin-compact
+  selector:
+    app: jaeger

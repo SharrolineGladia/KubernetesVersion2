@@ -13,6 +13,14 @@ from typing import Optional, Dict, Any
 _traces = {}
 _trace_lock = threading.Lock()
 
+# Jaeger exporter (optional - will be set if available)
+_jaeger_exporter = None
+
+def set_jaeger_exporter(exporter):
+    """Set the Jaeger exporter for automatic trace export"""
+    global _jaeger_exporter
+    _jaeger_exporter = exporter
+
 class TraceSpan:
     """Represents a single span in a distributed trace"""
     
@@ -182,6 +190,15 @@ class SpanContext:
             self.span.finish("error")
         else:
             self.span.finish("ok")
+        
+        # Export to Jaeger if exporter is configured
+        if _jaeger_exporter:
+            try:
+                _jaeger_exporter.export_span(self.span.to_dict())
+            except Exception as e:
+                # Don't fail the request if export fails
+                pass
+        
         set_current_span(self.previous_span)
 
 def trace_function(service_name: str, operation_name: str):
