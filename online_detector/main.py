@@ -38,6 +38,7 @@ sys.path.insert(0, str(ml_detector_scripts))
 try:
     from dual_feature_detector import DualFeatureDetector
     from explainability_layer import AnomalyExplainer, format_rca_report
+    from counterfactual_analyzer import CounterfactualAnalyzer
     XGBOOST_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  XGBoost modules not available: {e}")
@@ -45,6 +46,7 @@ except ImportError as e:
     XGBOOST_AVAILABLE = False
     DualFeatureDetector = None
     AnomalyExplainer = None
+    CounterfactualAnalyzer = None
 
 
 def main():
@@ -60,20 +62,41 @@ def main():
         model_path = os.path.join(os.path.dirname(__file__), '..', 'ml_detector', 'models', 'anomaly_detector_scaleinvariant.pkl')
         try:
             xgboost_detector = DualFeatureDetector(model_path=model_path)
-            explainer = AnomalyExplainer(model_path=model_path)
+            
+            # Initialize explainer with trace and log integration
+            log_file_path = os.path.join(os.path.dirname(__file__), '..', 'service_logs.json')
+            explainer = AnomalyExplainer(
+                model_path=model_path,
+                enable_traces=True,
+                enable_logs=True,
+                jaeger_url="http://localhost:16686",
+                log_file_path=log_file_path if os.path.exists(log_file_path) else None
+            )
+
+            # Initialize counterfactual analyzer for "what-if" explanations
+            feature_names = xgboost_detector.feature_names
+            counterfactual_analyzer = CounterfactualAnalyzer(
+                model=xgboost_detector.model,
+                feature_names=feature_names
+            )
+
             xgboost_enabled = True
             print("✅ XGBoost classifier loaded (topology-agnostic detection + RCA)")
+            print("✅ Explainer with trace & log integration enabled")
+            print("✅ Counterfactual analyzer enabled (prevention insights)")
         except Exception as e:
             print(f"⚠️  XGBoost classifier initialization failed: {e}")
             print("   Continuing with EWMA detection only")
             xgboost_enabled = False
             xgboost_detector = None
             explainer = None
+            counterfactual_analyzer = None
     else:
         print("⚠️  XGBoost modules not found - continuing with EWMA detection only")
         xgboost_enabled = False
         xgboost_detector = None
         explainer = None
+        counterfactual_analyzer = None
 
     # Classification cooldown tracking (prevent alert storms)
     last_classification_time = 0
@@ -302,17 +325,34 @@ def main():
                                 print(f"   Root Cause Service: {rca.root_cause}")
                                 print(f"   RCA Confidence: {rca.confidence:.1%}")
                                 print(f"   Severity: {rca.severity.upper()}")
-                                
+
                                 if rca.contributing_factors:
                                     print(f"\n   Contributing Factors:")
                                     for factor, severity in rca.contributing_factors.items():
                                         print(f"      • {factor}: {severity}")
-                                
+
                                 if rca.recommendations:
                                     print(f"\n   💡 Recommendations:")
                                     for i, rec in enumerate(rca.recommendations, 1):
                                         print(f"      {i}. {rec}")
-                            
+
+                                # COUNTERFACTUAL ANALYSIS - What could have prevented this?
+                                try:
+                                    counterfactual = counterfactual_analyzer.analyze(
+                                        features=detection_snapshot.features_scaleinvariant,
+                                        original_prediction=detection_snapshot.anomaly_type
+                                    )
+
+                                    if counterfactual:
+                                        print(counterfactual.format_human_readable())
+                                    else:
+                                        print(f"\n{'─'*80}")
+                                        print(f"⚠️  COUNTERFACTUAL ANALYSIS: Unable to generate prevention insights")
+                                        print(f"{'─'*80}")
+
+                                except Exception as cf_error:
+                                    print(f"\n⚠️  Counterfactual analysis failed: {cf_error}")
+
                             print(f"{'='*80}\n")
                             
                             # Update cooldown

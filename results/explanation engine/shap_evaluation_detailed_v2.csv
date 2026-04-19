@@ -1,0 +1,17 @@
+Metric,Value
+Anomaly-Only Top-1 Match Rate (%),66.05
+Anomaly-Only Top-3 Coverage Rate (%),70.26
+Normal Sparsity Score,0.0249
+Mean SHAP Stability,0.9242
+Std SHAP Stability,0.1331
+Mean Explanation Time (ms),154.85
+Mean Cache Lookup Time (ms),0.00
+OLD Flip Rate (%),7.00
+NEW Flip Rate (%),11.00
+OLD Feasible Rate (%),7.00
+NEW Feasible Rate (%),11.00
+Mean Single Delta,0.0195
+Mean Combined Delta,0.0000
+Mean Convergence Time (ms),12.02
+Recovery Alignment Rate (%),0.00
+Mean Recovery Confidence,0.8582

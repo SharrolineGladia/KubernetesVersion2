@@ -72,8 +72,12 @@ class DualFeatureDetector:
             saved_data = pickle.load(f)
             if isinstance(saved_data, dict):
                 self.model = saved_data.get('model', saved_data)
+                self.label_encoder = saved_data.get('label_encoder', None)
+                self.feature_columns = saved_data.get('feature_columns', None)
             else:
                 self.model = saved_data
+                self.label_encoder = None
+                self.feature_columns = None
         
         # Feature names (must match training data order)
         self.feature_names = [
@@ -264,10 +268,15 @@ class DualFeatureDetector:
         
         # Run RCA if enabled and anomaly detected
         if enable_rca and predicted_class != 'normal' and confidence >= self.confidence_threshold:
+            feature_dict = {
+                name: float(snapshot.features_scaleinvariant[i])
+                for i, name in enumerate(self.feature_names)
+            }
             snapshot.rca_result = self.explainer.explain_anomaly(
                 anomaly_type=predicted_class,
                 service_metrics=snapshot.service_metrics,
-                confidence=confidence
+                scale_invariant_features=feature_dict,
+                timestamp=datetime.fromisoformat(snapshot.metadata['timestamp'])
             )
         
         return snapshot

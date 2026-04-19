@@ -168,7 +168,7 @@ EWMA Stress Monitoring (5s intervals)
 - Recommendations: "Check logs", "Restart deployment", "Review recent changes", "Enable health checks"
 - Decision: Handle locally (high confidence)
 
-### Integration Test ([test_integration.py](test_integration.py))
+### Integration Test ([scripts/tests/test_integration.py](scripts/tests/test_integration.py))
 
 **Simulated Workflow:**
 
@@ -249,7 +249,7 @@ demo/
 │       ├── system_snapshot.py
 │       └── feature_extraction.py
 │
-├── test_integration.py              # EWMA + XGBoost integration demo
+├── scripts/tests/test_integration.py # EWMA + XGBoost integration demo
 ├── services/notification-service/    # Kubernetes service (monitored app)
 ├── k8s/                             # Kubernetes deployment configs
 ├── anomaly-trigger/                 # Load generation scripts
@@ -413,7 +413,7 @@ python test_dual_feature.py
 
 ```bash
 cd ..
-python test_integration.py
+python scripts/tests/test_integration.py
 ```
 
 ### 3. Run Online Detector (with EWMA)

@@ -1,0 +1,13 @@
+Metric,Value
+Top-1 Match Rate (%),39.97
+Top-3 Coverage Rate (%),42.20
+Mean SHAP Stability,0.9243
+Std SHAP Stability,0.1324
+Mean Explanation Time (ms),206.36
+Std Explanation Time (ms),12.41
+Mean Cache Lookup Time (ms),0.38
+Counterfactual Flip Rate (%),7.00
+Counterfactual Feasible Rate (%),6.00
+Mean Counterfactual Confidence,0.6028
+Mean Threshold Delta,0.0564
+Mean Convergence Time (ms),7.61

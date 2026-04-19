@@ -132,19 +132,54 @@ class PersistenceStateMachine:
         }
 
 class EWMAMetric:
-    def __init__(self):
+    """Enhanced EWMA with trend detection for Kubernetes production.
+    
+    Combines deviation detection (EWMA) with trend analysis to catch both:
+    - Sudden spikes (traditional EWMA)
+    - Gradual degradation (trend detection)
+    """
+    def __init__(self, enable_trend_detection=True, trend_window=40, warmup_samples=30):
         self.mean = None
         self.variance = 0.1  # Initialize with small positive value instead of 0
         self.n_samples = 0
+        
+        # Warm-up period: learn baseline before detecting anomalies
+        # At 5-second intervals, 30 samples = 150 seconds = 2.5 minutes
+        self.warmup_samples = warmup_samples
+        
+        # Trend detection for gradual changes
+        self.enable_trend_detection = enable_trend_detection
+        self.trend_window = trend_window
+        self.history = []
 
     def update(self, value: float):
         self.n_samples += 1
+        
+        # Store history for trend detection
+        if self.enable_trend_detection:
+            self.history.append(value)
+            if len(self.history) > self.trend_window:
+                self.history.pop(0)
         
         if self.mean is None:
             self.mean = value
             # Start with reasonable variance estimate
             self.variance = 0.1
-            return 0.0
+            return {"ewma_stress": 0.0, "trend_stress": 0.0, "absolute_stress": 0.0, "combined_stress": 0.0}
+        
+        # Warm-up period: learn baseline without triggering alerts
+        if self.n_samples <= self.warmup_samples:
+            # Update mean with EWMA
+            self.mean = EWMA_ALPHA * value + (1 - EWMA_ALPHA) * self.mean
+            
+            # Update variance with EWMA
+            delta = value - self.mean
+            self.variance = (
+                EWMA_ALPHA * (delta ** 2) + (1 - EWMA_ALPHA) * self.variance
+            )
+            self.variance = max(self.variance, 0.01)
+            
+            return {"ewma_stress": 0.0, "trend_stress": 0.0, "absolute_stress": 0.0, "combined_stress": 0.0}
 
         # Calculate deviation before updating mean
         delta = value - self.mean
@@ -160,14 +195,55 @@ class EWMAMetric:
         # Ensure variance doesn't collapse to zero
         self.variance = max(self.variance, 0.01)
         
-        # Calculate standardized score
+        # Calculate EWMA deviation stress
         std_dev = (self.variance ** 0.5)
         z_score = abs(delta) / (std_dev + EPSILON)
+        ewma_stress = min(1.0, z_score / Z_MAX)
         
-        # Normalize to [0, 1] range with smoother scaling
-        normalized_score = min(1.0, z_score / Z_MAX)
+        # Calculate trend stress (for gradual degradation)
+        trend_stress = 0.0
+        if self.enable_trend_detection and len(self.history) >= 10:
+            import numpy as np
+            # Linear regression on recent history
+            x = np.arange(len(self.history))
+            y = np.array(self.history)
+            
+            # Calculate slope
+            x_mean = np.mean(x)
+            y_mean = np.mean(y)
+            numerator = np.sum((x - x_mean) * (y - y_mean))
+            denominator = np.sum((x - x_mean) ** 2) + EPSILON
+            slope = numerator / denominator
+            
+            # Normalize slope to [0, 1] range
+            # Positive slope (increasing) indicates potential issue
+            # For CPU/Memory percentages (0-100 scale):
+            # - Slope of 0.25 per sample = 5% increase over 20 samples = should detect
+            # - Slope of 0.5 per sample = 10% increase over 20 samples = definite anomaly
+            # Scale: slope of 0.5 units/sample = full stress (more sensitive)
+            if slope > 0:
+                trend_stress = min(1.0, slope / 0.5)
         
-        return normalized_score
+        # Absolute threshold stress (prevents EWMA adaptation problem)
+        # If value is objectively high (>50% for CPU/Memory), flag it
+        # This catches sustained high loads that EWMA might adapt to
+        absolute_stress = 0.0
+        if value > 50.0:  # Start flagging at 50% utilization
+            # Scale from 50-100 to 0-1
+            # At 65%: stress = 0.3 (triggers stressed state)
+            # At 75%: stress = 0.5 (triggers critical state)
+            absolute_stress = min(1.0, (value - 50.0) / 50.0)
+        
+        # Combined stress: max of all three components (most sensitive wins)
+        # This catches: sudden spikes (EWMA), gradual degradation (trend), sustained high (absolute)
+        combined_stress = max(ewma_stress, trend_stress, absolute_stress)
+        
+        return {
+            "ewma_stress": ewma_stress,
+            "trend_stress": trend_stress,
+            "absolute_stress": absolute_stress,
+            "combined_stress": combined_stress
+        }
 
 
 class ResourceSaturationDetector:
@@ -208,14 +284,17 @@ class ResourceSaturationDetector:
     def update(self, cpu_val, mem_val, thread_val, timestamp=None):
         timestamp = timestamp or datetime.utcnow()
         
-        cpu_stress = self.cpu.update(cpu_val)
-        mem_stress = self.memory.update(mem_val)
-        thread_stress = self.threads.update(thread_val)
+        cpu_result = self.cpu.update(cpu_val)
+        mem_result = self.memory.update(mem_val)
+        thread_result = self.threads.update(thread_val)
 
         return {
-            "cpu": cpu_stress,
-            "memory": mem_stress,
-            "threads": thread_stress,
+            "cpu": cpu_result["combined_stress"],
+            "memory": mem_result["combined_stress"],
+            "threads": thread_result["combined_stress"],
+            "cpu_components": cpu_result,
+            "memory_components": mem_result,
+            "threads_components": thread_result,
             "timestamp": timestamp
         }
 
@@ -312,12 +391,14 @@ class PerformanceDegradationChannel:
     def update(self, raw_metric_value: float, timestamp=None):
         """Update metric and return current state using hybrid detection.
         
-        Combines EWMA (transient spikes) + absolute thresholds (sustained degradation).
+        Combines EWMA (transient spikes) + absolute thresholds (sustained degradation) + trend.
         """
         timestamp = timestamp or datetime.utcnow()
         
-        # Calculate EWMA stress signal (0-1 range)
-        ewma_signal = self.metric.update(raw_metric_value)
+        # Calculate EWMA stress signal with trend detection (0-1 range)
+        ewma_result = self.metric.update(raw_metric_value)
+        ewma_signal = ewma_result["ewma_stress"]
+        trend_signal = ewma_result["trend_stress"]
         
         # Calculate absolute threshold stress (0-1 range)
         # Maps raw value to stress level based on configured thresholds
@@ -334,15 +415,16 @@ class PerformanceDegradationChannel:
             absolute_stress = 0.5 + 0.5 * (raw_metric_value - self.stressed_threshold) / \
                              (self.critical_threshold - self.stressed_threshold)
         
-        # Hybrid stress: Take maximum of EWMA and absolute
-        # This catches BOTH transient spikes AND sustained degradation
-        combined_stress = max(ewma_signal, absolute_stress)
+        # Hybrid stress: Take maximum of EWMA, trend, and absolute
+        # This catches transient spikes, gradual degradation, AND sustained issues
+        combined_stress = max(ewma_signal, trend_signal, absolute_stress)
         
         # Store observation in rolling buffer
         observation = {
             "timestamp": timestamp.isoformat(),
             "raw_metric": raw_metric_value,
             "ewma_signal": ewma_signal,
+            "trend_signal": trend_signal,
             "absolute_stress": absolute_stress,
             "stress_score": combined_stress,
             "state": self.channel_fsm.current_state
@@ -433,12 +515,14 @@ class BackpressureOverloadChannel:
     def update(self, raw_metric_value: float, timestamp=None):
         """Update metric and return current state using hybrid detection.
         
-        Combines EWMA (transient spikes) + absolute thresholds (sustained degradation).
+        Combines EWMA (transient spikes) + absolute thresholds (sustained degradation) + trend.
         """
         timestamp = timestamp or datetime.utcnow()
         
-        # Calculate EWMA stress signal (0-1 range)
-        ewma_signal = self.metric.update(raw_metric_value)
+        # Calculate EWMA stress signal with trend detection (0-1 range)
+        ewma_result = self.metric.update(raw_metric_value)
+        ewma_signal = ewma_result["ewma_stress"]
+        trend_signal = ewma_result["trend_stress"]
         
         # Calculate absolute threshold stress (0-1 range)
         if raw_metric_value <= self.baseline_threshold:
@@ -454,15 +538,16 @@ class BackpressureOverloadChannel:
             absolute_stress = 0.5 + 0.5 * (raw_metric_value - self.stressed_threshold) / \
                              (self.critical_threshold - self.stressed_threshold)
         
-        # Hybrid stress: Take maximum of EWMA and absolute
-        # This catches BOTH transient spikes AND sustained degradation
-        combined_stress = max(ewma_signal, absolute_stress)
+        # Hybrid stress: Take maximum of EWMA, trend, and absolute
+        # This catches transient spikes, gradual degradation, AND sustained issues
+        combined_stress = max(ewma_signal, trend_signal, absolute_stress)
         
         # Store observation in rolling buffer
         observation = {
             "timestamp": timestamp.isoformat(),
             "raw_metric": raw_metric_value,
             "ewma_signal": ewma_signal,
+            "trend_signal": trend_signal,
             "absolute_stress": absolute_stress,
             "stress_score": combined_stress,
             "state": self.channel_fsm.current_state

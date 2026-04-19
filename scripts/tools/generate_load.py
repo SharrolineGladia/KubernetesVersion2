@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate heavy load on notification service to trigger real anomalies.
-Run from project root: python generate_load.py
+Run from project root: python scripts/tools/generate_load.py
 """
 
 import requests

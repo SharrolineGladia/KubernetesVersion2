@@ -200,7 +200,7 @@ python trigger_anomaly.py --stop
 #### **Method 2: Heavy Load (Realistic Scenario)**
 
 ```bash
-python generate_load.py
+python scripts/tools/generate_load.py
 # Runs 100 threads × 200 req/sec for 120 seconds
 ```
 
@@ -360,7 +360,7 @@ Use this to confirm system is working:
 
 ### **Load Generation**
 
-- [ ] `generate_load.py` successfully connects to service
+- [ ] `scripts/tools/generate_load.py` successfully connects to service
 - [ ] CPU/memory increases visible in raw metrics
 - [ ] Anomaly triggered within 30-60 seconds of load start
 
@@ -440,7 +440,7 @@ This is intentional to avoid false recoveries. Wait ~30 seconds after stopping l
 ## 📊 Expected Timeline (Realistic Load Test)
 
 ```
-00:00 - Start generate_load.py
+00:00 - Start scripts/tools/generate_load.py
 00:05 - Detector shows stress_score increasing (0.2 → 0.4)
 00:15 - State transition: NORMAL → STRESSED (stress_score > 0.35)
 00:30 - State transition: STRESSED → CRITICAL (stress_score > 0.60)
@@ -449,7 +449,7 @@ This is intentional to avoid false recoveries. Wait ~30 seconds after stopping l
 00:34 - 🎯 Anomaly type: CPU_SPIKE (confidence: 92%)
 00:35 - 🔍 Root cause: notification service
 00:36 - 💡 Recommendations displayed (scale, profile, check logs)
-02:00 - generate_load.py completes
+02:00 - scripts/tools/generate_load.py completes
 02:15 - State transition: CRITICAL → STRESSED (3 consecutive below 0.60)
 02:45 - State transition: STRESSED → NORMAL (5 consecutive below 0.35)
 03:00 - System stabilized
@@ -489,7 +489,7 @@ This is intentional to avoid false recoveries. Wait ~30 seconds after stopping l
    - complete pipeline is verified working:
 
 6. **Test Different Anomaly Types**
-   - CPU spike: Use `generate_load.py` or `trigger_anomaly.py --resource`
+   - CPU spike: Use `scripts/tools/generate_load.py` or `trigger_anomaly.py --resource`
    - Memory leak: Modify trigger to gradually increase memory
    - Service crash: Stop notification service pod (`kubectl delete pod -n journal-implementation -l app=notification-service`)
 
@@ -546,7 +546,7 @@ python -m online_detector.main
 
 # Terminal 3: Generate load
 
-python generate_load.py
+python scripts/tools/generate_load.py
 
 # Watch Terminal 2 for:
 

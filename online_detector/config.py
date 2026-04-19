@@ -23,19 +23,20 @@ CPU_WEIGHT = float(os.getenv("CPU_WEIGHT", "0.5"))
 MEMORY_WEIGHT = float(os.getenv("MEMORY_WEIGHT", "0.3"))
 THREAD_WEIGHT = float(os.getenv("THREAD_WEIGHT", "0.2"))
 
-# Thresholds (adjusted for baseline variation tolerance)
+# Thresholds (balanced for Kubernetes production - cannot miss critical anomalies)
 # NORMAL_THRESHOLD: when combined stress score exceeds this, start counting toward stressed
 # ANOMALY_THRESHOLD: when combined stress score exceeds this, start counting toward critical
-NORMAL_THRESHOLD = float(os.getenv("NORMAL_THRESHOLD", "0.35"))
-ANOMALY_THRESHOLD = float(os.getenv("ANOMALY_THRESHOLD", "0.60"))
+# Lowered from 0.35/0.60 to 0.30/0.50 for better recall while maintaining acceptable FAR
+NORMAL_THRESHOLD = float(os.getenv("NORMAL_THRESHOLD", "0.30"))
+ANOMALY_THRESHOLD = float(os.getenv("ANOMALY_THRESHOLD", "0.50"))
 
 # Persistence FSM windows (consecutive samples).
 # With SCRAPE_INTERVAL_SECONDS=5, each window is ~5s.
-# Increased windows for more stable detection and baseline establishment
-NORMAL_TO_STRESSED_WINDOWS = int(os.getenv("NORMAL_TO_STRESSED_WINDOWS", "3"))
-STRESSED_TO_CRITICAL_WINDOWS = int(os.getenv("STRESSED_TO_CRITICAL_WINDOWS", "3"))
-STRESSED_TO_NORMAL_WINDOWS = int(os.getenv("STRESSED_TO_NORMAL_WINDOWS", "5"))
-CRITICAL_TO_STRESSED_WINDOWS = int(os.getenv("CRITICAL_TO_STRESSED_WINDOWS", "3"))
+# Balanced for Kubernetes: fast enough to catch issues, stable enough to avoid flapping
+NORMAL_TO_STRESSED_WINDOWS = int(os.getenv("NORMAL_TO_STRESSED_WINDOWS", "2"))
+STRESSED_TO_CRITICAL_WINDOWS = int(os.getenv("STRESSED_TO_CRITICAL_WINDOWS", "2"))
+STRESSED_TO_NORMAL_WINDOWS = int(os.getenv("STRESSED_TO_NORMAL_WINDOWS", "4"))
+CRITICAL_TO_STRESSED_WINDOWS = int(os.getenv("CRITICAL_TO_STRESSED_WINDOWS", "2"))
 
 # Target service
 SERVICE_NAME = os.getenv("SERVICE_NAME", "notification-service")

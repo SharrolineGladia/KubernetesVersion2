@@ -1,0 +1,17 @@
+# Recovery Evaluation Requirements
+
+# Core dependencies
+numpy>=1.21.0
+pandas>=1.3.0
+matplotlib>=3.4.0
+
+# Kubernetes client (for live evaluation)
+kubernetes>=18.20.0
+
+# HTTP requests
+requests>=2.26.0
+
+# Machine learning (already in ml_detector)
+# xgboost>=1.5.0
+# scikit-learn>=1.0.0
+# shap>=0.40.0

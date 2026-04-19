@@ -15,9 +15,10 @@ import sys
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 
-# Add paths
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from ml_detector.scripts.dual_feature_detector import DualFeatureDetector
 
@@ -72,10 +73,7 @@ def test_integration():
     print("1️⃣ Initializing Components...")
     online_detector = OnlineDetectorSimulator()
     
-    model_path = os.path.join(
-        os.path.dirname(__file__), 
-        'ml_detector', 'models', 'anomaly_detector_scaleinvariant.pkl'
-    )
+    model_path = PROJECT_ROOT / 'ml_detector' / 'models' / 'anomaly_detector_scaleinvariant.pkl'
     xgboost_classifier = DualFeatureDetector(
         model_path=model_path,
         confidence_threshold=0.80,
